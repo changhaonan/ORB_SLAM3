@@ -34,18 +34,18 @@ int main(int argc, char **argv)
 {  
     if(argc < 5)
     {
-        cerr << endl << "Usage: ./mono_euroc path_to_vocabulary path_to_settings path_to_sequence_folder_1 path_to_times_file_1 (path_to_image_folder_2 path_to_times_file_2 ... path_to_image_folder_N path_to_times_file_N) (trajectory_file_name)" << endl;
+        cerr << endl << "Usage: ./mono_euroc path_to_vocabulary path_to_settings path_to_sequence_folder_1 path_to_times_file_1 (path_to_image_folder_2 path_to_times_file_2 ... path_to_image_folder_N path_to_times_file_N) (output_path)" << endl;
         return 1;
     }
 
     const int num_seq = (argc-3)/2;
     cout << "num_seq = " << num_seq << endl;
-    bool bFileName= (((argc-3) % 2) == 1);
-    string file_name;
-    if (bFileName)
+    bool bOutputPath= (((argc-3) % 2) == 1);
+    string output_path;
+    if (bOutputPath)
     {
-        file_name = string(argv[argc-1]);
-        cout << "file name: " << file_name << endl;
+        output_path = string(argv[argc-1]);
+        cout << "output path: " << output_path << endl;
     }
 
     // Load all sequences:
@@ -62,13 +62,12 @@ int main(int argc, char **argv)
     for (seq = 0; seq<num_seq; seq++)
     {
         cout << "Loading images for sequence " << seq << "...";
-        LoadImages(string(argv[(2*seq)+3]) + "/mav0/cam0/data", string(argv[(2*seq)+4]), vstrImageFilenames[seq], vTimestampsCam[seq]);
+        LoadImages(string(argv[(2*seq)+3]) + "/cam0/data", string(argv[(2*seq)+4]), vstrImageFilenames[seq], vTimestampsCam[seq]);
         cout << "LOADED!" << endl;
 
         nImages[seq] = vstrImageFilenames[seq].size();
         tot_images += nImages[seq];
     }
-
     // Vector for tracking time statistics
     vector<float> vTimesTrack;
     vTimesTrack.resize(tot_images);
@@ -80,7 +79,7 @@ int main(int argc, char **argv)
     int fps = 20;
     float dT = 1.f/fps;
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM3::System SLAM(argv[1],argv[2],ORB_SLAM3::System::MONOCULAR, false);
+    ORB_SLAM3::System SLAM(argv[1],argv[2],ORB_SLAM3::System::MONOCULAR, true);
     float imageScale = SLAM.GetImageScale();
 
     double t_resize = 0.f;
@@ -172,11 +171,20 @@ int main(int argc, char **argv)
 
         if(seq < num_seq - 1)
         {
-            string kf_file_submap =  "./SubMaps/kf_SubMap_" + std::to_string(seq) + ".txt";
-            string f_file_submap =  "./SubMaps/f_SubMap_" + std::to_string(seq) + ".txt";
+            string kf_file_submap;
+            string f_file_submap;
+            if (bOutputPath)
+            {
+                kf_file_submap = output_path + "/kf_SubMap_" + std::to_string(seq) + ".txt";
+                f_file_submap =  output_path + "/f_SubMap_" + std::to_string(seq) + ".txt";
+            }
+            else
+            {
+                kf_file_submap =  "./SubMaps/kf_SubMap_" + std::to_string(seq) + ".txt";
+                f_file_submap =  "./SubMaps/f_SubMap_" + std::to_string(seq) + ".txt";
+            }
             SLAM.SaveTrajectoryEuRoC(f_file_submap);
             SLAM.SaveKeyFrameTrajectoryEuRoC(kf_file_submap);
-
             cout << "Changing the dataset" << endl;
 
             SLAM.ChangeDataset();
@@ -187,10 +195,10 @@ int main(int argc, char **argv)
     SLAM.Shutdown();
 
     // Save camera trajectory
-    if (bFileName)
+    if (bOutputPath)
     {
-        const string kf_file =  "kf_" + string(argv[argc-1]) + ".txt";
-        const string f_file =  "f_" + string(argv[argc-1]) + ".txt";
+        const string kf_file =  output_path + "/keyframe.txt";
+        const string f_file =  output_path + "/frame.txt";
         SLAM.SaveTrajectoryEuRoC(f_file);
         SLAM.SaveKeyFrameTrajectoryEuRoC(kf_file);
     }
@@ -200,6 +208,7 @@ int main(int argc, char **argv)
         SLAM.SaveKeyFrameTrajectoryEuRoC("KeyFrameTrajectory.txt");
     }
 
+    std::cout << "Finished!" << std::endl;
     return 0;
 }
 
